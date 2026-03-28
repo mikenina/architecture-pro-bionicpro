@@ -1,0 +1,109 @@
+version: '3.8'
+
+name: bionicpro
+
+services:
+  keycloak_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: keycloak_db
+      POSTGRES_USER: keycloak_user
+      POSTGRES_PASSWORD: keycloak_password
+    volumes:
+      - ./postgres-keycloak-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - bionicpro-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:21.1
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
+      KC_DB_USERNAME: keycloak_user
+      KC_DB_PASSWORD: keycloak_password
+    command: 
+      - start-dev
+      - --import-realm
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+    ports:
+      - "8080:8080"
+    depends_on:
+      - keycloak_db
+    networks:
+      - bionicpro-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - bionicpro-network
+
+  auth:
+    build:
+      context: ./bionicpro-auth
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - KEYCLOAK_INTERNAL_URL=http://keycloak:8080
+      - KEYCLOAK_EXTERNAL_URL=http://localhost:8080
+      - KEYCLOAK_REALM=reports-realm
+      - KEYCLOAK_CLIENT_ID=bionicpro-auth
+      - KEYCLOAK_CLIENT_SECRET=oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq
+      - REDIS_URL=redis://redis:6379
+      - AUTH_CALLBACK_URL=http://localhost:3000/callback
+      - FRONTEND_URL=http://localhost:3000
+      - SESSION_TTL=1800
+    depends_on:
+      - keycloak
+      - redis
+    volumes:
+      - ./bionicpro-auth:/app
+    networks:
+      - bionicpro-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+    depends_on:
+      - auth
+    volumes:
+      - ./frontend:/app
+    networks:
+      - bionicpro-network
+
+#  openldap:
+#    image: osixia/openldap:1.5.0
+#    container_name: openldap
+#    command: --copy-service
+#    volumes:
+#      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/50-bootstrap.ldif
+#    environment:
+#      - LDAP_ORGANISATION=example-com
+#      - LDAP_DOMAIN=example.com
+#      - LDAP_ADMIN_PASSWORD=admin
+#    ports:
+#      - "389:389"
+#      - "636:636"
+#    networks:
+#      - bionicpro-network
+
+networks:
+  bionicpro-network:
+    driver: bridge
+
+volumes:
+  redis-data: {}

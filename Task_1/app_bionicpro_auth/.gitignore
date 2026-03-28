@@ -1,4 +1,6 @@
 /postgres-keycloak-data
 2024__yandex-architecture-sso.code-workspace
 
-.idea
+
+bionicpro-auth/__pycache__/
+bionicpro-auth/auth/__pycache__/
