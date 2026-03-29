@@ -131,5 +131,110 @@
         "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq", 
         "bearerOnly": true
       }
-    ]
+    ],
+  "components" : {
+    "org.keycloak.storage.UserStorageProvider" : [ {
+      "name" : "Test ldap",
+      "providerId" : "ldap",
+      "subComponents" : {
+        "org.keycloak.storage.ldap.mappers.LDAPStorageMapper" : [ {
+          "name" : "last name",
+          "providerId" : "user-attribute-ldap-mapper",
+          "subComponents" : { },
+          "config" : {
+            "ldap.attribute" : [ "sn" ],
+            "is.mandatory.in.ldap" : [ "true" ],
+            "always.read.value.from.ldap" : [ "true" ],
+            "read.only" : [ "true" ],
+            "user.model.attribute" : [ "lastName" ]
+          }
+        }, {
+          "name" : "roles",
+          "providerId" : "role-ldap-mapper",
+          "subComponents" : { },
+          "config" : {
+            "membership.attribute.type" : [ "DN" ],
+            "group.name.ldap.attribute" : [ "cn" ],
+            "preserve.group.inheritance" : [ "false" ],
+            "membership.user.ldap.attribute" : [ "uid" ],
+            "role.name.ldap.attribute" : [ "cn" ],
+            "use.realm.roles.mapping" : [ "true" ],
+            "role.object.classes" : [ "groupOfNames" ],
+            "mode" : [ "READ_ONLY" ],
+            "roles.dn" : [ "ou=Groups,dc=example,dc=com" ],
+            "user.roles.retrieve.strategy" : [ "LOAD_ROLES_BY_MEMBER_ATTRIBUTE" ],
+            "membership.ldap.attribute" : [ "member" ],
+            "ignore.missing.groups" : [ "false" ],
+            "memberof.ldap.attribute" : [ "memberOf" ],
+            "group.object.classes" : [ "groupOfNames" ],
+            "groups.path" : [ "/" ],
+            "drop.non.existing.groups.during.sync" : [ "false" ]
+          }
+        }, {
+          "name" : "first name",
+          "providerId" : "user-attribute-ldap-mapper",
+          "subComponents" : { },
+          "config" : {
+            "ldap.attribute" : [ "cn" ],
+            "is.mandatory.in.ldap" : [ "true" ],
+            "read.only" : [ "true" ],
+            "always.read.value.from.ldap" : [ "true" ],
+            "user.model.attribute" : [ "firstName" ]
+          }
+        }, {
+          "name" : "username",
+          "providerId" : "user-attribute-ldap-mapper",
+          "subComponents" : { },
+          "config" : {
+            "ldap.attribute" : [ "uid" ],
+            "is.mandatory.in.ldap" : [ "true" ],
+            "always.read.value.from.ldap" : [ "false" ],
+            "read.only" : [ "true" ],
+            "user.model.attribute" : [ "username" ]
+          }
+        }, {
+          "name" : "email",
+          "providerId" : "user-attribute-ldap-mapper",
+          "subComponents" : { },
+          "config" : {
+            "ldap.attribute" : [ "mail" ],
+            "is.mandatory.in.ldap" : [ "true" ],
+            "attribute.force.default" : [ "false" ],
+            "is.binary.attribute" : [ "false" ],
+            "always.read.value.from.ldap" : [ "false" ],
+            "read.only" : [ "true" ],
+            "user.model.attribute" : [ "email" ]
+          }
+        } ]
+      },
+      "config" : {
+        "fullSyncPeriod" : [ "-1" ],
+        "pagination" : [ "false" ],
+        "startTls" : [ "false" ],
+        "connectionPooling" : [ "false" ],
+        "usersDn" : [ "ou=People,dc=example,dc=com" ],
+        "cachePolicy" : [ "DEFAULT" ],
+        "useKerberosForPasswordAuthentication" : [ "false" ],
+        "importEnabled" : [ "false" ],
+        "enabled" : [ "true" ],
+        "changedSyncPeriod" : [ "-1" ],
+        "bindDn" : [ "cn=admin,dc=example,dc=com" ],
+        "usernameLDAPAttribute" : [ "uid" ],
+        "bindCredential" : [ "admin" ],
+        "vendor" : [ "other" ],
+        "uuidLDAPAttribute" : [ "entryUUID" ],
+        "allowKerberosAuthentication" : [ "false" ],
+        "connectionUrl" : [ "ldap://openldap:389" ],
+        "syncRegistrations" : [ "false" ],
+        "authType" : [ "simple" ],
+        "useTruststoreSpi" : [ "ldapsOnly" ],
+        "usePasswordModifyExtendedOp" : [ "false" ],
+        "trustEmail" : [ "false" ],
+        "userObjectClasses" : [ "inetOrgPerson, organizationalPerson" ],
+        "rdnLDAPAttribute" : [ "uid" ],
+        "editMode" : [ "READ_ONLY" ],
+        "validatePasswordPolicy" : [ "false" ]
+      }
+    } ]
   }
+}

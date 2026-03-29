@@ -1,0 +1,94 @@
+auth-1         | INFO:     172.28.0.1:54092 - "GET /auth/login HTTP/1.1" 307 Temporary Redirect
+openldap       | 69c936df conn=1019 fd=12 ACCEPT from IP=172.28.0.5:58476 (IP=0.0.0.0:389)
+openldap       | 69c936df conn=1019 op=0 BIND dn="cn=admin,dc=example,dc=com" method=128
+openldap       | 69c936df conn=1019 op=0 BIND dn="cn=admin,dc=example,dc=com" mech=SIMPLE ssf=0
+openldap       | 69c936df conn=1019 op=0 RESULT tag=97 err=0 text=
+openldap       | 69c936df conn=1019 op=1 SRCH base="ou=People,dc=example,dc=com" scope=2 deref=3 filter="(&(mail=john@example.com)(objectClass=inetOrgPerson)(objectClass=organizationalPerson))"
+openldap       | 69c936df conn=1019 op=1 SRCH attr=entryUUID uid mail sn cn objectclass
+openldap       | 69c936df conn=1019 op=1 SEARCH RESULT tag=101 err=0 nentries=1 text=
+openldap       | 69c936df conn=1019 op=2 UNBIND
+openldap       | 69c936df conn=1019 fd=12 closed
+openldap       | 69c936df conn=1020 fd=12 ACCEPT from IP=172.28.0.5:58478 (IP=0.0.0.0:389)
+openldap       | 69c936df conn=1020 op=0 BIND dn="uid=john.doe,ou=People,dc=example,dc=com" method=128
+openldap       | 69c936df conn=1020 op=0 BIND dn="uid=john.doe,ou=People,dc=example,dc=com" mech=SIMPLE ssf=0
+openldap       | 69c936df conn=1020 op=0 RESULT tag=97 err=0 text=
+openldap       | 69c936df conn=1020 op=1 UNBIND
+openldap       | 69c936df conn=1020 fd=12 closed
+frontend-1     | 172.28.0.1 - - [29/Mar/2026:14:27:43 +0000] "GET /callback?session_state=064d3286-e9ae-4c72-b175-0e6284a403d6&code=f4babe2d-b237-4b07-8a56-132925a46c2f.064d3286-e9ae-4c72-b175-0e6284a403d6.1de53045-86f4-4b26-822f-9b61aa359919 HTTP/1.1" 200 226 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:149.0) Gecko/20100101 Firefox/149.0" "-"
+auth-1         | INFO:auth.keycloak_client:Exchanging code at: http://keycloak:8080/realms/reports-realm/protocol/openid-connect/token
+auth-1         | INFO:auth.keycloak_client:Client ID: bionicpro-auth
+auth-1         | INFO:auth.keycloak_client:Request data: {'grant_type': 'authorization_code', 'code': 'f4babe2d-b237-4b07-8a56-132925a46c2f.064d3286-e9ae-4c72-b175-0e6284a403d6.1de53045-86f4-4b26-822f-9b61aa359919', 'redirect_uri': 'http://localhost:3000/callback', 'client_id': 'bionicpro-auth'}
+openldap       | 69c936df conn=1021 fd=12 ACCEPT from IP=172.28.0.5:58494 (IP=0.0.0.0:389)
+openldap       | 69c936df conn=1021 op=0 BIND dn="cn=admin,dc=example,dc=com" method=128
+openldap       | 69c936df conn=1021 op=0 BIND dn="cn=admin,dc=example,dc=com" mech=SIMPLE ssf=0
+openldap       | 69c936df conn=1021 op=0 RESULT tag=97 err=0 text=
+openldap       | 69c936df conn=1021 op=1 SRCH base="ou=People,dc=example,dc=com" scope=2 deref=3 filter="(&(uid=john.doe)(objectClass=inetOrgPerson)(objectClass=organizationalPerson))"
+openldap       | 69c936df conn=1021 op=1 SRCH attr=entryUUID uid mail sn cn objectclass
+openldap       | 69c936df conn=1021 op=1 SEARCH RESULT tag=101 err=0 nentries=1 text=
+openldap       | 69c936df conn=1021 op=2 UNBIND
+openldap       | 69c936df conn=1021 fd=12 closed
+openldap       | 69c936df conn=1022 fd=12 ACCEPT from IP=172.28.0.5:58504 (IP=0.0.0.0:389)
+openldap       | 69c936df conn=1022 op=0 BIND dn="cn=admin,dc=example,dc=com" method=128
+openldap       | 69c936df conn=1022 op=0 BIND dn="cn=admin,dc=example,dc=com" mech=SIMPLE ssf=0
+openldap       | 69c936df conn=1022 op=0 RESULT tag=97 err=0 text=
+openldap       | 69c936df conn=1022 op=1 SRCH base="ou=Groups,dc=example,dc=com" scope=2 deref=3 filter="(&(member=uid=john.doe,ou=people,dc=example,dc=com)(objectClass=groupOfNames))"
+openldap       | 69c936df conn=1022 op=1 SRCH attr=entryUUID cn objectclass
+openldap       | 69c936df <= mdb_equality_candidates: (member) not indexed
+openldap       | 69c936df conn=1022 op=1 SEARCH RESULT tag=101 err=0 nentries=1 text=
+openldap       | 69c936df conn=1022 op=2 UNBIND
+openldap       | 69c936df conn=1022 fd=12 closed
+auth-1         | INFO:httpx:HTTP Request: POST http://keycloak:8080/realms/reports-realm/protocol/openid-connect/token "HTTP/1.1 200 OK"
+auth-1         | INFO:auth.keycloak_client:Response status: 200
+auth-1         | INFO:auth.keycloak_client:Response body: {"access_token":"eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJJMEZ4RWNRaFpSYURxYXZhV28yUHdPTHRwbG5OVWxiYTVDcmt0VzRWZjJnIn0.eyJleHAiOjE3NzQ3OTQ1ODMsImlhdCI6MTc3NDc5NDQ2MywiYXV0aF90aW1lIjoxNzc0Nzk0NDYzLCJqdGkiOiI0ZGE3Zjc1My04NzYzLTQ2NDAtYWY4My1iOGQyNzVmMjMwMzEiLCJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjgwODAvcmVhbG1zL3JlcG9ydHMtcmVhbG0iLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiZjplNTVlMmI3Ny0zMDVmLTQzODgtYjhlNC1jZTJhMjUwMGFiMzI6am9obi5kb2UiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJiaW9uaWNwcm8tYXV0aCIsInNlc3Npb25fc3RhdGUiOiIwNjRkMzI4Ni1lOWFlLTRjNzItYjE3NS0wZTYyODRhNDAzZDYiLCJhY3IiOiIxIiwiYWxsb3dlZC1vcmlnaW5zIjpbImh0dHA6Ly9sb2NhbGhvc3Q6MzAwMCJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsicHJvdGhldGljX3VzZXIiLCJkZWZhdWx0LXJvbGVzLXJlcG9ydHMtcmVhbG0iXX0sInJlc291cmNlX2FjY2VzcyI6eyJhY2NvdW50Ijp7InJvbGVzIjpbIm1hbmFnZS1hY2NvdW50IiwibWFuYWdlLWFjY291bnQtbGlua3MiLCJ2aWV3LXByb2ZpbGUiXX19LCJzY29wZSI6Im9wZW5pZCBlbWFpbCBwcm9maWxlIiwic2lkIjoiMDY0ZDMyODYtZTlhZS00YzcyLWIxNzUtMGU2Mjg0YTQwM2Q2IiwiZW1haWxfdmVyaWZpZWQiOmZhbHNlLCJuYW1lIjoiSm9obiBEb2UiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJqb2huLmRvZSIsImdpdmVuX25hbWUiOiJKb2huIiwiZmFtaWx5X25hbWUiOiJEb2UiLCJlbWFpbCI6ImpvaG5AZXhhbXBsZS5jb20ifQ.nXvi0CMIZJwPXEMvbtWQmS8KtBA7gxtoEZu3UysYOz85DYmtgX51qd1K-NVLcQVNXYMKm7Yp0sSGdo2Grs-kWXAu8V-0BQ4iAY2OMLPvTzrCY37gQETtFO44sba9kjX35WB8qPYIDot6ZmdsyK21WK9yK6ETarhFSsQTHxzRwMx1T69x1mqBHoW4plcSJyDo-LHZ29q5nQFDIIM90InU3D4z3bhX8jjwz1RqyoItGTQLPuzIwP8dmsNBjwA7uYwzGshWbpVQNAmR5gbJ_9FYNN11kyT5l91rpdhNzOmeKZhh_E0ODOTQq2HgFnRKEq55wHi88pCXNpwMlO76SmE5Hg","expires_in":120,"refresh_expires_in":1800,"refresh_token":"eyJhbGciOiJIUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJmZTU2OTM1MC1mNDk1LTQwZDQtODY4Zi1mODU2OWMyM2EwZjkifQ.eyJleHAiOjE3NzQ3OTYyNjMsImlhdCI6MTc3NDc5NDQ2MywianRpIjoiY2MxNzMyNzAtZTA5Zi00MjY4LTk4N2MtNGYwNGUyYjJiMDk2IiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwL3JlYWxtcy9yZXBvcnRzLXJlYWxtIiwiYXVkIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwL3JlYWxtcy9yZXBvcnRzLXJlYWxtIiwic3ViIjoiZjplNTVlMmI3Ny0zMDVmLTQzODgtYjhlNC1jZTJhMjUwMGFiMzI6am9obi5kb2UiLCJ0eXAiOiJSZWZyZXNoIiwiYXpwIjoiYmlvbmljcHJvLWF1dGgiLCJzZXNzaW9uX3N0YXRlIjoiMDY0ZDMyODYtZTlhZS00YzcyLWIxNzUtMGU2Mjg0YTQwM2Q2Iiwic2NvcGUiOiJvcGVuaWQgZW1haWwgcHJvZmlsZSIsInNpZCI6IjA2NGQzMjg2LWU5YWUtNGM3Mi1iMTc1LTBlNjI4NGE0MDNkNiJ9.6BHJ1XBcWC2zNVIRIoSDW_DlLgYHSMlnnbgrU2rWxWQ","token_type":"Bearer","id_token":"eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJJMEZ4RWNRaFpSYURxYXZhV28yUHdPTHRwbG5OVWxiYTVDcmt0VzRWZjJnIn0.eyJleHAiOjE3NzQ3OTQ1ODMsImlhdCI6MTc3NDc5NDQ2MywiYXV0aF90aW1lIjoxNzc0Nzk0NDYzLCJqdGkiOiJjOGQ5MDIxOC04MjY1LTRjMWUtOTg2ZS03ZmRlYjg3Y2IwZTMiLCJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjgwODAvcmVhbG1zL3JlcG9ydHMtcmVhbG0iLCJhdWQiOiJiaW9uaWNwcm8tYXV0aCIsInN1YiI6ImY6ZTU1ZTJiNzctMzA1Zi00Mzg4LWI4ZTQtY2UyYTI1MDBhYjMyOmpvaG4uZG9lIiwidHlwIjoiSUQiLCJhenAiOiJiaW9uaWNwcm8tYXV0aCIsInNlc3Npb25fc3RhdGUiOiIwNjRkMzI4Ni1lOWFlLTRjNzItYjE3NS0wZTYyODRhNDAzZDYiLCJhdF9oYXNoIjoiOGRZOHZOSUItX2pfWE1wT2xSWGN5QSIsImFjciI6IjEiLCJzaWQiOiIwNjRkMzI4Ni1lOWFlLTRjNzItYjE3NS0wZTYyODRhNDAzZDYiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJKb2huIERvZSIsInByZWZlcnJlZF91c2VybmFtZSI6ImpvaG4uZG9lIiwiZ2l2ZW5fbmFtZSI6IkpvaG4iLCJmYW1pbHlfbmFtZSI6IkRvZSIsImVtYWlsIjoiam9obkBleGFtcGxlLmNvbSJ9.Qnngx3BKcFIsr1ePpqnPSGb6rTUu8csPXWPFBy1wnGinJhriige6Lb58JVjpFJnyAY3IQbkLoJYXuESB7nswhpO_8n7HD1T3DlB2Xvtbc3h_Wkwaq93FyxsTyKAmwBSTJF2aSuzdVPCujKtg-0DOvOdXhkNSaMsAgBIxcO8asF0BXanOLeo-HHbfnr3YolKUnfioDPh5l2pFvCnsg6q1TOTS7CHOXrqxEN0k_n1LQNfhTgVGX21ObJP4jz2HGsGECksCmRBnAVZ9mqW0xfvdjM4je0qOZG9H0nuPSfKDD1aXMfj7rwpdOC0KHubokSuO5r2Y4HZCXq7lawyn4FbEhA","not-before-policy":0,"session_state":"064d3286-e9ae-4c72-b175-0e6284a403d6","scope":"openid email profile"}
+auth-1         | Decoded token payload: {
+auth-1         |   "exp": 1774794583,
+auth-1         |   "iat": 1774794463,
+auth-1         |   "auth_time": 1774794463,
+auth-1         |   "jti": "4da7f753-8763-4640-af83-b8d275f23031",
+auth-1         |   "iss": "http://localhost:8080/realms/reports-realm",
+auth-1         |   "aud": "account",
+auth-1         |   "sub": "f:e55e2b77-305f-4388-b8e4-ce2a2500ab32:john.doe",
+auth-1         |   "typ": "Bearer",
+auth-1         |   "azp": "bionicpro-auth",
+auth-1         |   "session_state": "064d3286-e9ae-4c72-b175-0e6284a403d6",
+auth-1         |   "acr": "1",
+auth-1         |   "allowed-origins": [
+auth-1         |     "http://localhost:3000"
+auth-1         |   ],
+auth-1         |   "realm_access": {
+auth-1         |     "roles": [
+auth-1         |       "prothetic_user",
+auth-1         |       "default-roles-reports-realm"
+auth-1         |     ]
+auth-1         |   },
+auth-1         |   "resource_access": {
+auth-1         |     "account": {
+auth-1         |       "roles": [
+auth-1         |         "manage-account",
+auth-1         |         "manage-account-links",
+auth-1         |         "view-profile"
+auth-1         |       ]
+auth-1         |     }
+auth-1         |   },
+auth-1         |   "scope": "openid email profile",
+auth-1         |   "sid": "064d3286-e9ae-4c72-b175-0e6284a403d6",
+auth-1         |   "email_verified": false,
+auth-1         |   "name": "John Doe",
+auth-1         |   "preferred_username": "john.doe",
+auth-1         |   "given_name": "John",
+auth-1         |   "family_name": "Doe",
+auth-1         |   "email": "john@example.com"
+auth-1         | }
+auth-1         | User data: user_id=f:e55e2b77-305f-4388-b8e4-ce2a2500ab32:john.doe, username=john.doe, email=john@example.com, roles=['prothetic_user', 'default-roles-reports-realm']
+auth-1         | INFO:     172.28.0.1:45550 - "GET /auth/callback?code=f4babe2d-b237-4b07-8a56-132925a46c2f.064d3286-e9ae-4c72-b175-0e6284a403d6.1de53045-86f4-4b26-822f-9b61aa359919 HTTP/1.1" 200 OK
+auth-1         | INFO:main:=== /auth/me called ===
+auth-1         | INFO:main:Cookies received: {'JSESSIONID': 'FE69014C42824ABB013ED40503243F28', 'session_id': 'd0afd7c5-5ed4-46e1-b461-ecd789c619ce'}
+auth-1         | INFO:main:Session ID from cookie: d0afd7c5-5ed4-46e1-b461-ecd789c619ce
+auth-1         | INFO:main:Session found: user=john.doe, access_token_expires_at=1774794583
+auth-1         | INFO:main:Current time: 1774794463, Access token expires at: 1774794583
+auth-1         | INFO:main:Access token still valid
+auth-1         | INFO:main:Rotating session: old session_id=d0afd7c5-5ed4-46e1-b461-ecd789c619ce
+auth-1         | INFO:main:Session rotated: new session_id=db7815a7-b7bd-469f-824e-83e97aaf07f0
+auth-1         | INFO:main:Cookie updated with new session_id=db7815a7-b7bd-469f-824e-83e97aaf07f0
+auth-1         | INFO:     172.28.0.1:45550 - "GET /auth/me HTTP/1.1" 200 OK
+

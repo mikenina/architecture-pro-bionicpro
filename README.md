@@ -20,6 +20,7 @@ docker compose up -d
 ```
 
 ### Задача 3. Обеспечьте безопасное получение и хранение access-и refresh-токенов.
+### Задача 4. Добавьте LDAP для возможности получения данных о пользователях представительства BionicPRO в другой стране.
 
 [Backend Auth Service](./Task_1/app_bionicpro_auth)
 
