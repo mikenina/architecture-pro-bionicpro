@@ -17,7 +17,9 @@ services:
       - bionicpro-network
 
   keycloak:
-    image: quay.io/keycloak/keycloak:21.1
+    build:
+      context: ./keycloak
+      dockerfile: Dockerfile
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin

@@ -236,5 +236,130 @@
         "validatePasswordPolicy" : [ "false" ]
       }
     } ]
-  }
+  },
+  "authenticationFlows" : [
+    {
+      "alias" : "browser-with-otp",
+      "description" : "browser based authentication with OTP",
+      "providerId" : "basic-flow",
+      "topLevel" : true,
+      "builtIn" : false,
+      "authenticationExecutions" : [ {
+        "authenticator" : "identity-provider-redirector",
+        "authenticatorFlow" : false,
+        "requirement" : "ALTERNATIVE",
+        "priority" : 25,
+        "autheticatorFlow" : false,
+        "userSetupAllowed" : false
+      }, {
+        "authenticatorFlow" : true,
+        "requirement" : "ALTERNATIVE",
+        "priority" : 30,
+        "autheticatorFlow" : true,
+        "flowAlias" : "browser-with-otp forms",
+        "userSetupAllowed" : false
+      } ]
+    }, {
+      "alias" : "browser-with-otp forms",
+      "description" : "Username, password, otp and other auth forms.",
+      "providerId" : "basic-flow",
+      "topLevel" : false,
+      "builtIn" : false,
+      "authenticationExecutions" : [ {
+        "authenticator" : "auth-username-password-form",
+        "authenticatorFlow" : false,
+        "requirement" : "REQUIRED",
+        "priority" : 10,
+        "autheticatorFlow" : false,
+        "userSetupAllowed" : false
+      }, {
+        "authenticator" : "auth-otp-form",
+        "authenticatorFlow" : false,
+        "requirement" : "REQUIRED",
+        "priority" : 21,
+        "autheticatorFlow" : false,
+        "userSetupAllowed" : false
+      } ]
+    }
+    ],
+  "browserFlow" : "browser-with-otp",
+  "requiredCredentials" : [ "password" ],
+  "otpPolicyType" : "totp",
+  "otpPolicyAlgorithm" : "HmacSHA1",
+  "otpPolicyInitialCounter" : 0,
+  "otpPolicyDigits" : 8,
+  "otpPolicyLookAheadWindow" : 1,
+  "otpPolicyPeriod" : 60,
+  "otpPolicyCodeReusable" : false,
+  "otpSupportedApplications" : [ "totpAppFreeOTPName" ],
+  "webAuthnPolicyRpEntityName" : "keycloak",
+  "webAuthnPolicySignatureAlgorithms" : [ "ES256" ],
+  "webAuthnPolicyRpId" : "",
+  "webAuthnPolicyAttestationConveyancePreference" : "not specified",
+  "webAuthnPolicyAuthenticatorAttachment" : "not specified",
+  "webAuthnPolicyRequireResidentKey" : "not specified",
+  "webAuthnPolicyUserVerificationRequirement" : "not specified",
+  "webAuthnPolicyCreateTimeout" : 0,
+  "webAuthnPolicyAvoidSameAuthenticatorRegister" : false,
+  "webAuthnPolicyAcceptableAaguids" : [ ],
+  "webAuthnPolicyPasswordlessRpEntityName" : "keycloak",
+  "webAuthnPolicyPasswordlessSignatureAlgorithms" : [ "ES256" ],
+  "webAuthnPolicyPasswordlessRpId" : "",
+  "webAuthnPolicyPasswordlessAttestationConveyancePreference" : "not specified",
+  "webAuthnPolicyPasswordlessAuthenticatorAttachment" : "not specified",
+  "webAuthnPolicyPasswordlessRequireResidentKey" : "not specified",
+  "webAuthnPolicyPasswordlessUserVerificationRequirement" : "not specified",
+  "webAuthnPolicyPasswordlessCreateTimeout" : 0,
+  "webAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister" : false,
+  "webAuthnPolicyPasswordlessAcceptableAaguids" : [ ],
+  "identityProviderMappers" : [ {
+    "id" : "5d7797ea-35d4-4d91-a63e-b2ac630284b5",
+    "name" : "role",
+    "identityProviderAlias" : "yandex",
+    "identityProviderMapper" : "oidc-hardcoded-role-idp-mapper",
+    "config" : {
+      "syncMode" : "INHERIT",
+      "role" : "user"
+    }
+  }, {
+    "id" : "e89dff2c-79b0-4bf0-bad2-c21460d905c1",
+    "name" : "firstName",
+    "identityProviderAlias" : "yandex",
+    "identityProviderMapper" : "yandex-user-attribute-mapper",
+    "config" : {
+      "syncMode" : "INHERIT",
+      "jsonField" : "first_name",
+      "userAttribute" : "firstName"
+    }
+  }, {
+    "id" : "4245b2e9-26a1-455b-b6b7-f210c4b45305",
+    "name" : "email",
+    "identityProviderAlias" : "yandex",
+    "identityProviderMapper" : "yandex-user-attribute-mapper",
+    "config" : {
+      "syncMode" : "INHERIT",
+      "jsonField" : "default_email",
+      "userAttribute" : "email"
+    }
+  }, {
+    "id" : "4f486eb3-3c51-4be1-b5e8-36fd7976c750",
+    "name" : "lastName",
+    "identityProviderAlias" : "yandex",
+    "identityProviderMapper" : "yandex-user-attribute-mapper",
+    "config" : {
+      "syncMode" : "INHERIT",
+      "jsonField" : "last_name",
+      "userAttribute" : "lastName"
+    }
+  }, {
+    "id" : "6eef1681-ca0a-4e3f-9d8f-1e118d39fd51",
+    "name" : "username",
+    "identityProviderAlias" : "yandex",
+    "identityProviderMapper" : "yandex-user-attribute-mapper",
+    "config" : {
+      "syncMode" : "INHERIT",
+      "jsonField" : "login",
+      "userAttribute" : "username"
+    }
+  } ]
 }
