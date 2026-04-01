@@ -7,17 +7,17 @@
 
 ## Задание 1. Повышение безопасности системы
 ### Задача 1. Предложите архитектурное решение и доработайте диаграмму C4 для управления учётными данными пользователя. 
-![](./Task_1/BionicPRO_C4_model.drawio.png)
+![](Task_1_2/BionicPRO_C4_model.drawio.png)
 
 ### Задача 2. Улучшите безопасность существующего приложения, заменив Code Grant на PKCE.
 _Его нужно добавить к уже существующим приложениям — фронтенду и Keycloak._
 
-[PKCE code](./Task_1/app_pkce)
+[PKCE code](Task_1_2/app_pkce)
 
 [realm-front-pkce.json](./keycloak/realm-front-pkce.json)
 
 ```bash
-cd ./Task_1/app_pkce
+cd ./Task_1_2/app_pkce
 docker compose up -d
 ```
 
@@ -26,12 +26,12 @@ docker compose up -d
 ### Задача 4. Добавьте LDAP для возможности получения данных о пользователях представительства BionicPRO в другой стране.
 ### Задача 5. Настройте MFA.
 
-[Backend Auth Service code](./Task_1/app_bionicpro_auth)
+[Backend Auth Service code](Task_1_2/app_bionicpro_auth)
 
 [keycloak-results-export.json](./keycloak/keycloak-results-export.json)
 
 ```bash
-cd ./Task_1/app_bionicpro_auth
+cd ./Task_1_2/app_bionicpro_auth
 docker compose up -d
 ```
 
@@ -42,7 +42,7 @@ http://localhost:8080/admin/master/console/
 
 http://localhost:3000/
 
-![task_1_sequence.png](./Task_1/task_1_sequence.png)
+![task_1_sequence.png](Task_1_2/task_1_sequence.png)
 
 ##### Выгрузка конфига из Keycloak
 ```bash
@@ -55,7 +55,7 @@ docker cp bionicpro-keycloak-1:/tmp/realm-export.json ./keycloak/keycloak-result
 https://github.com/playa-ru/keycloak-russian-providers
 
 ```bash 
-cd ./Task_1/app_bionicpro_auth
+cd ./Task_1_2/app_bionicpro_auth
 
 mkdir -p keycloak/providers
 

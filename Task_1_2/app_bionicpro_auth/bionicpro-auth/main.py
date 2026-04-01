@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from typing import Optional
 import time
+from pydantic import BaseModel
 
 from config import settings, KEYCLOAK_AUTH_URL_EXTERNAL
 from auth.keycloak_client import KeycloakClient
@@ -181,6 +182,38 @@ async def logout(request: Request, response: Response):
             await session_manager.delete_session(session_id)
     
     response.delete_cookie("session_id")
+    return {"success": True}
+
+class UpdateCookieRequest(BaseModel):
+    session_id: str
+
+@app.post("/auth/refresh-cookie")
+async def refresh_cookie(request: UpdateCookieRequest, response: Response):
+    """
+    Обновление session cookie при ротации сессии.
+    Вызывается фронтендом, когда бизнес-сервис вернул X-New-Session-Id.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # Проверяем, что сессия существует
+    session = await session_manager.get_session(request.session_id)
+    if not session:
+        logger.warning(f"Session not found for refresh: {request.session_id}")
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    logger.info(f"Refreshing cookie for session: {request.session_id}")
+
+    response.set_cookie(
+        key="session_id",
+        value=request.session_id,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=settings.SESSION_TTL,
+        path="/"
+    )
+
     return {"success": True}
 
 # ========== Эндпоинт для бизнес-сервисов ==========

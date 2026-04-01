@@ -36,6 +36,24 @@ uid: alex.johnson
 mail: alex@example.com
 userPassword: password
 
+dn: uid=rebecca.harmon,ou=People,dc=example,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+cn: Rebecca
+sn: Harmon
+uid: rebecca.harmon
+mail: rebecca.harmon@example.com
+userPassword: password
+
+dn: uid=david.richards,ou=People,dc=example,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+cn: David
+sn: Richards
+uid: david.richards
+mail: david.richards@example.com
+userPassword: password
+
 # Роли
 dn: cn=user,ou=Groups,dc=example,dc=com
 objectClass: groupOfNames
@@ -47,3 +65,5 @@ objectClass: groupOfNames
 cn: prothetic_user
 member: uid=alex.johnson,ou=People,dc=example,dc=com
 member: uid=john.doe,ou=People,dc=example,dc=com
+member: uid=rebecca.harmon,ou=People,dc=example,dc=com
+member: uid=david.richards,ou=People,dc=example,dc=com
