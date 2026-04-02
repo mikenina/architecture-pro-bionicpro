@@ -1,0 +1,64 @@
+sequenceDiagram
+    participant Airflow as Airflow (Scheduler)
+    participant TelemetryDB as Telemetry DB (PostgreSQL)
+    participant CRMDB as CRM DB (PostgreSQL)
+    participant XCom as XCom / Variable
+    participant ClickHouse as ClickHouse (OLAP)
+
+    Note over Airflow,ClickHouse: ETL Pipeline - Runs every minute
+
+    loop Every minute
+        Airflow->>Airflow: DAG: telemetry_etl
+        Airflow->>Airflow: Extract task starts
+        
+        Airflow->>XCom: Get last_processed_time
+        XCom-->>Airflow: last_run or null
+        
+        alt First run (no last_run)
+            Airflow->>Airflow: Set last_run = '2025-01-01 00:00:00'
+            Airflow->>Airflow: Log: "First run, fetching all data"
+        else Subsequent runs
+            Airflow->>Airflow: Use last_run from XCom
+            Airflow->>Airflow: Log: "Fetching data after {last_run}"
+        end
+        
+        par Extract Telemetry
+            Airflow->>TelemetryDB: SELECT * FROM telemetry_data<br/>WHERE signal_time > '{last_run}'<br/>ORDER BY signal_time
+            TelemetryDB-->>Airflow: telemetry_df (10000 records)
+            Airflow->>XCom: Store telemetry_data (JSON)
+        and Extract CRM
+            Airflow->>CRMDB: SELECT id as user_id, age, gender, country<br/>FROM customers
+            CRMDB-->>Airflow: crm_df (1000 records)
+            Airflow->>XCom: Store crm_data (JSON)
+        end
+        
+        Airflow->>Airflow: Enrich & Load task starts
+        
+        Airflow->>XCom: Get telemetry_data
+        XCom-->>Airflow: telemetry_df
+        Airflow->>XCom: Get crm_data
+        XCom-->>Airflow: crm_df
+        
+        Airflow->>Airflow: Transform: JOIN on user_id<br/>Fill missing values (age=0, gender='Unknown')
+        Airflow->>Airflow: Convert data types<br/>(int64, int8, float64, datetime)
+        
+        Airflow->>ClickHouse: CREATE DATABASE IF NOT EXISTS reports
+        ClickHouse-->>Airflow: OK
+        
+        Airflow->>ClickHouse: CREATE TABLE IF NOT EXISTS telemetry_stat<br/>(user_id UInt32, age UInt8, ...)<br/>ENGINE = MergeTree()
+        ClickHouse-->>Airflow: OK
+        
+        alt Data exists
+            Airflow->>ClickHouse: INSERT INTO telemetry_stat<br/>(user_id, age, gender, country, ...)<br/>VALUES (...)
+            ClickHouse-->>Airflow: Rows inserted
+            Airflow->>Airflow: Log: "Loaded X records to ClickHouse"
+            
+            Airflow->>Airflow: Get max(signal_time) from batch
+            Airflow->>XCom: Store last_processed_time = max_time
+        else No data
+            Airflow->>Airflow: Log: "No new data to process"
+        end
+        
+        Airflow->>Airflow: Task completed
+        Airflow->>Airflow: Wait for next schedule
+    end
