@@ -89,8 +89,8 @@ docker compose up --build -d
 ```
 
 #### Тестовые пользователи (ldap)
-- rebecca.harmon / password
-- david.richards / password
+- rebecca.harmon / password (id = 871)
+- david.richards / password (id = 318)
 
 ![reports-screenshot](reports-screenshot.png)
 
@@ -98,7 +98,28 @@ docker compose up --build -d
 ![get-report-sequence](schemas/get-report-sequence.png)
 
 ## Задание 3. Снижение нагрузки на базу данных
-не успеваю по срокам :(
+### Пайплайн
+1. ETL запускается по расписанию
+2. Загружает новые данные
+3. Обновляет etl_version.json в S3 (меняется метка времени)
+4. Пользователь запрашивает отчёт
+5. API видит, что версия отчёта (в метаданных) не совпадает с текущей
+6. Генерирует новый отчёт
+7. Сохраняет его в S3 с новой версией в метаданных
+8. Отдаёт CDN ссылку
+9. При повторном запросе (до следующего ETL) edge cache отдаёт кешированную версию
+
+```bash
+docker exec -it bionicpro-minio-1 sh -c "
+    curl -sL https://dl.min.io/client/mc/release/linux-amd64/mc -o /tmp/mc && \
+    chmod +x /tmp/mc && \
+    /tmp/mc alias set local http://localhost:9000 minio_user minio_password && \
+    /tmp/mc anonymous set download local/reports && \
+    echo 'Bucket reports is now public'
+"
+```
+
+![reports-cached-screenshot](reports-cached-screenshot.png)
 
 ## Задание 4. Повышение оперативности и стабильности работы CRM
 не успеваю по срокам :(

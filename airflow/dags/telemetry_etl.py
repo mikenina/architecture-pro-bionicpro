@@ -5,6 +5,10 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.models import Variable
 import pandas as pd
 import logging
+from airflow.operators.python import PythonOperator
+import boto3
+import json
+from botocore.config import Config
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -25,7 +29,7 @@ dag = DAG(
     'telemetry_etl',
     default_args=default_args,
     description='ETL: Load telemetry data from PostgreSQL to ClickHouse',
-    schedule_interval='* * * * *',
+    schedule_interval='0 * * * *',
     catchup=False,
     tags=['bionicpro', 'telemetry', 'etl'],
     max_active_runs=1,
@@ -243,5 +247,63 @@ save_time_task = PythonOperator(
     dag=dag,
 )
 
+def update_etl_version(**context):
+    """
+    Обновляет метку времени последнего успешного ETL в S3.
+    """
+    # Проверяем, были ли новые данные
+    telemetry_json = context['task_instance'].xcom_pull(
+        key='telemetry_data',
+        task_ids='extract_telemetry'
+    )
+
+    if not telemetry_json:
+        print("No new data. Skipping ETL version update.")
+        return "No new data, version not updated"
+
+    minio_endpoint = 'http://minio:9000'
+    minio_access_key = 'minio_user'
+    minio_secret_key = 'minio_password'
+    bucket = 'reports'
+    metadata_key = 'metadata/etl_version.json'
+
+    s3_client = boto3.client(
+        's3',
+        endpoint_url=minio_endpoint,
+        aws_access_key_id=minio_access_key,
+        aws_secret_access_key=minio_secret_key,
+        config=Config(signature_version='s3v4'),
+        region_name='us-east-1'
+    )
+
+    # Создаём bucket, если не существует
+    try:
+        s3_client.head_bucket(Bucket=bucket)
+    except:
+        s3_client.create_bucket(Bucket=bucket)
+        print(f"Bucket '{bucket}' created")
+
+    # Сохраняем новую версию etl в общие метаданные
+    new_version = datetime.now().isoformat()
+    s3_client.put_object(
+        Bucket=bucket,
+        Key=metadata_key,
+        Body=json.dumps({
+            'version': new_version,
+            'updated_at': new_version,
+            'description': 'ETL completed'
+        })
+    )
+
+    print(f"ETL version updated to {new_version}")
+    return new_version
+
+
+update_etl_version_task = PythonOperator(
+    task_id='update_etl_version',
+    python_callable=update_etl_version,
+    dag=dag,
+)
+
 # Порядок выполнения
-[extract_telemetry_task, extract_crm_task] >> enrich_load_task >> save_time_task
+[extract_telemetry_task, extract_crm_task] >> enrich_load_task >> save_time_task >> update_etl_version_task
