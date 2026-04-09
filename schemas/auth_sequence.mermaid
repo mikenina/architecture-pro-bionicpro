@@ -1,0 +1,91 @@
+sequenceDiagram
+    participant User
+    participant Browser as Browser (React SPA)
+    participant Auth as Auth Service (bionicpro-auth)
+    participant Redis as Redis (Session Store)
+    participant Keycloak as Keycloak (IdP)
+    participant Yandex as Яндекс ID (External IdP)
+    participant LDAP as OpenLDAP (EU Users)
+
+    Note over User,LDAP: 1. Начало аутентификации
+
+    User->>Browser: Нажимает "Login"
+    Browser->>Auth: GET /auth/login
+    Auth-->>Browser: 302 Redirect to Keycloak
+    Browser->>Keycloak: GET /auth?client_id=...&redirect_uri=...
+
+    Note over User,LDAP: 2. Выбор способа входа в Keycloak
+
+    Keycloak->>Browser: Страница логина с опциями:
+    Note over Browser: - Логин/пароль<br/>- Войти через Яндекс<br/>- Войти через LDAP
+
+    alt Локальный пользователь Keycloak
+        User->>Keycloak: Вводит логин/пароль
+        Keycloak->>Keycloak: Проверка credentials
+    else LDAP пользователь (EU)
+        User->>Keycloak: Выбирает LDAP логин
+        Keycloak->>LDAP: Поиск пользователя по uid
+        LDAP-->>Keycloak: Данные пользователя
+        Keycloak->>LDAP: Проверка пароля
+        LDAP-->>Keycloak: Успех
+        Keycloak->>Keycloak: Получение ролей из LDAP групп
+    else Яндекс ID
+        User->>Keycloak: Нажимает "Войти через Яндекс"
+        Keycloak->>Yandex: GET /authorize?client_id=...&redirect_uri=...
+        Yandex-->>Browser: Страница авторизации Яндекса
+        User->>Yandex: Подтверждает доступ
+        Yandex-->>Keycloak: 302 Redirect with code
+        Keycloak->>Yandex: POST /token (code + client_secret)
+        Yandex-->>Keycloak: access_token + refresh_token
+        Keycloak->>Yandex: GET /info (user data)
+        Yandex-->>Keycloak: email, first_name, last_name, login
+        Keycloak->>Keycloak: Сохраняет данные пользователя
+    end
+
+    Note over Browser,Redis: 3. Обмен code на сессию (общий для всех)
+
+    Keycloak-->>Browser: 302 Redirect with code
+    Browser->>Auth: GET /auth/callback?code=...
+    Auth->>Keycloak: POST /token (code + client_secret)
+    Keycloak-->>Auth: access_token + refresh_token
+    Auth->>Auth: Декодирует access_token (получает user data)
+    Auth->>Redis: SET session:{session_id} (tokens + user)
+    Redis-->>Auth: OK
+    Auth-->>Browser: 200 OK + Set-Cookie: session_id
+    Browser->>Browser: Сохраняет session_id cookie
+
+    Note over Browser,Redis: 4. Проверка аутентификации
+
+    Browser->>Auth: GET /auth/me (Cookie: session_id)
+    Auth->>Redis: GET session:{session_id}
+    Redis-->>Auth: session data
+    
+    alt access_token валиден
+        Auth->>Auth: Проверяет access_token TTL
+        Auth-->>Browser: 200 OK (user data)
+    else access_token истек
+        Auth->>Auth: Обнаруживает истекший access_token
+        Auth->>Keycloak: POST /token (refresh_token)
+        Keycloak-->>Auth: new access_token
+        Auth->>Redis: UPDATE session:{session_id} (new tokens)
+        Auth-->>Browser: 200 OK (user data)
+    end
+
+    Note over Browser,Redis: 5. Ротация сессии (при каждом запросе)
+
+    Browser->>Auth: GET /auth/me (Cookie: session_id_old)
+    Auth->>Redis: GET session:{session_id_old}
+    Redis-->>Auth: session data
+    Auth->>Redis: DELETE session:{session_id_old}
+    Auth->>Redis: SET session:{session_id_new}
+    Auth-->>Browser: 200 OK + Set-Cookie: session_id_new
+
+    Note over Browser,Keycloak: 6. Выход из системы
+
+    User->>Browser: Нажимает "Logout"
+    Browser->>Auth: POST /auth/logout (Cookie: session_id)
+    Auth->>Redis: GET session:{session_id}
+    Redis-->>Auth: session data
+    Auth->>Keycloak: POST /logout (refresh_token)
+    Auth->>Redis: DELETE session:{session_id}
+    Auth-->>Browser: 200 OK + Delete-Cookie: session_id

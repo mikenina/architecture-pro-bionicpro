@@ -1,6 +1,8 @@
 {
     "realm": "reports-realm",
     "enabled": true,
+    "accessTokenLifespan": 120,
+    "ssoSessionMaxLifespan": 1800,
     "roles": {
       "realm": [
         {
@@ -111,12 +113,16 @@
     ],
     "clients": [
       {
-        "clientId": "reports-frontend",
+        "clientId": "bionicpro-auth",
         "enabled": true,
-        "publicClient": true,
-        "redirectUris": ["http://localhost:3000/*"],
-        "webOrigins": ["http://localhost:3000"],
-        "directAccessGrantsEnabled": true
+        "publicClient": false,
+        "clientAuthenticatorType": "client-secret",
+        "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq",
+        "redirectUris": ["http://localhost:3000/callback"],
+        "standardFlowEnabled": true,
+        "directAccessGrantsEnabled": false,
+        "serviceAccountsEnabled": false,
+        "bearerOnly": false
       },
       {
         "clientId": "reports-api",
@@ -125,5 +131,235 @@
         "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq", 
         "bearerOnly": true
       }
-    ]
-  }
+    ],
+  "components" : {
+    "org.keycloak.storage.UserStorageProvider" : [ {
+      "name" : "Test ldap",
+      "providerId" : "ldap",
+      "subComponents" : {
+        "org.keycloak.storage.ldap.mappers.LDAPStorageMapper" : [ {
+          "name" : "last name",
+          "providerId" : "user-attribute-ldap-mapper",
+          "subComponents" : { },
+          "config" : {
+            "ldap.attribute" : [ "sn" ],
+            "is.mandatory.in.ldap" : [ "true" ],
+            "always.read.value.from.ldap" : [ "true" ],
+            "read.only" : [ "true" ],
+            "user.model.attribute" : [ "lastName" ]
+          }
+        }, {
+          "name" : "roles",
+          "providerId" : "role-ldap-mapper",
+          "subComponents" : { },
+          "config" : {
+            "membership.attribute.type" : [ "DN" ],
+            "group.name.ldap.attribute" : [ "cn" ],
+            "preserve.group.inheritance" : [ "false" ],
+            "membership.user.ldap.attribute" : [ "uid" ],
+            "role.name.ldap.attribute" : [ "cn" ],
+            "use.realm.roles.mapping" : [ "true" ],
+            "role.object.classes" : [ "groupOfNames" ],
+            "mode" : [ "READ_ONLY" ],
+            "roles.dn" : [ "ou=Groups,dc=example,dc=com" ],
+            "user.roles.retrieve.strategy" : [ "LOAD_ROLES_BY_MEMBER_ATTRIBUTE" ],
+            "membership.ldap.attribute" : [ "member" ],
+            "ignore.missing.groups" : [ "false" ],
+            "memberof.ldap.attribute" : [ "memberOf" ],
+            "group.object.classes" : [ "groupOfNames" ],
+            "groups.path" : [ "/" ],
+            "drop.non.existing.groups.during.sync" : [ "false" ]
+          }
+        }, {
+          "name" : "first name",
+          "providerId" : "user-attribute-ldap-mapper",
+          "subComponents" : { },
+          "config" : {
+            "ldap.attribute" : [ "cn" ],
+            "is.mandatory.in.ldap" : [ "true" ],
+            "read.only" : [ "true" ],
+            "always.read.value.from.ldap" : [ "true" ],
+            "user.model.attribute" : [ "firstName" ]
+          }
+        }, {
+          "name" : "username",
+          "providerId" : "user-attribute-ldap-mapper",
+          "subComponents" : { },
+          "config" : {
+            "ldap.attribute" : [ "uid" ],
+            "is.mandatory.in.ldap" : [ "true" ],
+            "always.read.value.from.ldap" : [ "false" ],
+            "read.only" : [ "true" ],
+            "user.model.attribute" : [ "username" ]
+          }
+        }, {
+          "name" : "email",
+          "providerId" : "user-attribute-ldap-mapper",
+          "subComponents" : { },
+          "config" : {
+            "ldap.attribute" : [ "mail" ],
+            "is.mandatory.in.ldap" : [ "true" ],
+            "attribute.force.default" : [ "false" ],
+            "is.binary.attribute" : [ "false" ],
+            "always.read.value.from.ldap" : [ "false" ],
+            "read.only" : [ "true" ],
+            "user.model.attribute" : [ "email" ]
+          }
+        } ]
+      },
+      "config" : {
+        "fullSyncPeriod" : [ "-1" ],
+        "pagination" : [ "false" ],
+        "startTls" : [ "false" ],
+        "connectionPooling" : [ "false" ],
+        "usersDn" : [ "ou=People,dc=example,dc=com" ],
+        "cachePolicy" : [ "DEFAULT" ],
+        "useKerberosForPasswordAuthentication" : [ "false" ],
+        "importEnabled" : [ "false" ],
+        "enabled" : [ "true" ],
+        "changedSyncPeriod" : [ "-1" ],
+        "bindDn" : [ "cn=admin,dc=example,dc=com" ],
+        "usernameLDAPAttribute" : [ "uid" ],
+        "bindCredential" : [ "admin" ],
+        "vendor" : [ "other" ],
+        "uuidLDAPAttribute" : [ "entryUUID" ],
+        "allowKerberosAuthentication" : [ "false" ],
+        "connectionUrl" : [ "ldap://openldap:389" ],
+        "syncRegistrations" : [ "false" ],
+        "authType" : [ "simple" ],
+        "useTruststoreSpi" : [ "ldapsOnly" ],
+        "usePasswordModifyExtendedOp" : [ "false" ],
+        "trustEmail" : [ "false" ],
+        "userObjectClasses" : [ "inetOrgPerson, organizationalPerson" ],
+        "rdnLDAPAttribute" : [ "uid" ],
+        "editMode" : [ "READ_ONLY" ],
+        "validatePasswordPolicy" : [ "false" ]
+      }
+    } ]
+  },
+  "authenticationFlows" : [
+    {
+      "alias" : "browser-with-otp",
+      "description" : "browser based authentication with OTP",
+      "providerId" : "basic-flow",
+      "topLevel" : true,
+      "builtIn" : false,
+      "authenticationExecutions" : [ {
+        "authenticator" : "identity-provider-redirector",
+        "authenticatorFlow" : false,
+        "requirement" : "ALTERNATIVE",
+        "priority" : 25,
+        "autheticatorFlow" : false,
+        "userSetupAllowed" : false
+      }, {
+        "authenticatorFlow" : true,
+        "requirement" : "ALTERNATIVE",
+        "priority" : 30,
+        "autheticatorFlow" : true,
+        "flowAlias" : "browser-with-otp forms",
+        "userSetupAllowed" : false
+      } ]
+    }, {
+      "alias" : "browser-with-otp forms",
+      "description" : "Username, password, otp and other auth forms.",
+      "providerId" : "basic-flow",
+      "topLevel" : false,
+      "builtIn" : false,
+      "authenticationExecutions" : [ {
+        "authenticator" : "auth-username-password-form",
+        "authenticatorFlow" : false,
+        "requirement" : "REQUIRED",
+        "priority" : 10,
+        "autheticatorFlow" : false,
+        "userSetupAllowed" : false
+      }, {
+        "authenticator" : "auth-otp-form",
+        "authenticatorFlow" : false,
+        "requirement" : "REQUIRED",
+        "priority" : 21,
+        "autheticatorFlow" : false,
+        "userSetupAllowed" : false
+      } ]
+    }
+    ],
+  "browserFlow" : "browser-with-otp",
+  "requiredCredentials" : [ "password" ],
+  "otpPolicyType" : "totp",
+  "otpPolicyAlgorithm" : "HmacSHA1",
+  "otpPolicyInitialCounter" : 0,
+  "otpPolicyDigits" : 8,
+  "otpPolicyLookAheadWindow" : 1,
+  "otpPolicyPeriod" : 60,
+  "otpPolicyCodeReusable" : false,
+  "otpSupportedApplications" : [ "totpAppFreeOTPName" ],
+  "webAuthnPolicyRpEntityName" : "keycloak",
+  "webAuthnPolicySignatureAlgorithms" : [ "ES256" ],
+  "webAuthnPolicyRpId" : "",
+  "webAuthnPolicyAttestationConveyancePreference" : "not specified",
+  "webAuthnPolicyAuthenticatorAttachment" : "not specified",
+  "webAuthnPolicyRequireResidentKey" : "not specified",
+  "webAuthnPolicyUserVerificationRequirement" : "not specified",
+  "webAuthnPolicyCreateTimeout" : 0,
+  "webAuthnPolicyAvoidSameAuthenticatorRegister" : false,
+  "webAuthnPolicyAcceptableAaguids" : [ ],
+  "webAuthnPolicyPasswordlessRpEntityName" : "keycloak",
+  "webAuthnPolicyPasswordlessSignatureAlgorithms" : [ "ES256" ],
+  "webAuthnPolicyPasswordlessRpId" : "",
+  "webAuthnPolicyPasswordlessAttestationConveyancePreference" : "not specified",
+  "webAuthnPolicyPasswordlessAuthenticatorAttachment" : "not specified",
+  "webAuthnPolicyPasswordlessRequireResidentKey" : "not specified",
+  "webAuthnPolicyPasswordlessUserVerificationRequirement" : "not specified",
+  "webAuthnPolicyPasswordlessCreateTimeout" : 0,
+  "webAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister" : false,
+  "webAuthnPolicyPasswordlessAcceptableAaguids" : [ ],
+  "identityProviderMappers" : [ {
+    "id" : "5d7797ea-35d4-4d91-a63e-b2ac630284b5",
+    "name" : "role",
+    "identityProviderAlias" : "yandex",
+    "identityProviderMapper" : "oidc-hardcoded-role-idp-mapper",
+    "config" : {
+      "syncMode" : "INHERIT",
+      "role" : "user"
+    }
+  }, {
+    "id" : "e89dff2c-79b0-4bf0-bad2-c21460d905c1",
+    "name" : "firstName",
+    "identityProviderAlias" : "yandex",
+    "identityProviderMapper" : "yandex-user-attribute-mapper",
+    "config" : {
+      "syncMode" : "INHERIT",
+      "jsonField" : "first_name",
+      "userAttribute" : "firstName"
+    }
+  }, {
+    "id" : "4245b2e9-26a1-455b-b6b7-f210c4b45305",
+    "name" : "email",
+    "identityProviderAlias" : "yandex",
+    "identityProviderMapper" : "yandex-user-attribute-mapper",
+    "config" : {
+      "syncMode" : "INHERIT",
+      "jsonField" : "default_email",
+      "userAttribute" : "email"
+    }
+  }, {
+    "id" : "4f486eb3-3c51-4be1-b5e8-36fd7976c750",
+    "name" : "lastName",
+    "identityProviderAlias" : "yandex",
+    "identityProviderMapper" : "yandex-user-attribute-mapper",
+    "config" : {
+      "syncMode" : "INHERIT",
+      "jsonField" : "last_name",
+      "userAttribute" : "lastName"
+    }
+  }, {
+    "id" : "6eef1681-ca0a-4e3f-9d8f-1e118d39fd51",
+    "name" : "username",
+    "identityProviderAlias" : "yandex",
+    "identityProviderMapper" : "yandex-user-attribute-mapper",
+    "config" : {
+      "syncMode" : "INHERIT",
+      "jsonField" : "login",
+      "userAttribute" : "username"
+    }
+  } ]
+}

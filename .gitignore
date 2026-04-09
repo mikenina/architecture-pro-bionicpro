@@ -1,2 +1,14 @@
 /postgres-keycloak-data
 2024__yandex-architecture-sso.code-workspace
+.idea
+
+bionicpro-auth/__pycache__/
+bionicpro-auth/auth/__pycache__/
+
+keycloak/providers/
+keycloak/keycloak-results-export.json.bk
+
+airflow-db-data/
+clickhouse-data/
+postgres-crm-data/
+postgres-telemetry-data/

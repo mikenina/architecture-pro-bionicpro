@@ -1,0 +1,76 @@
+sequenceDiagram
+    participant User as User (Browser)
+    participant Frontend as Frontend (React)
+    participant ReportAPI as Report API (FastAPI)
+    participant AuthService as Auth Service (FastAPI)
+    participant Redis as Redis (Session Store)
+    participant Keycloak as Keycloak (IdP)
+    participant CRM as CRM DB (PostgreSQL)
+    participant ClickHouse as ClickHouse (OLAP)
+
+    Note over User,ClickHouse: 1. Запрос отчёта с датами
+
+    User->>Frontend: Выбирает даты и нажимает "Get Report"
+    Frontend->>Frontend: Формирует GET /reports?start_date=...&end_date=...
+    Frontend->>ReportAPI: GET /reports<br/>Cookie: session_id_old
+
+    Note over ReportAPI,AuthService: 2. Валидация сессии
+
+    ReportAPI->>ReportAPI: Получает session_id из cookie
+    ReportAPI->>AuthService: POST /session/validate<br/>Cookie: session_id_old
+    
+    AuthService->>Redis: GET session:{session_id_old}
+    Redis-->>AuthService: Session data (user, tokens)
+    
+    alt Session not found
+        AuthService-->>ReportAPI: {valid: false}
+        ReportAPI-->>Frontend: 401 Unauthorized
+        Frontend->>User: Redirect to Login
+    else Session found
+        AuthService->>AuthService: Check access_token expiry
+        AuthService->>AuthService: current_time vs expires_at
+        
+        alt access_token expired
+            AuthService->>Keycloak: POST /token (refresh_token)
+            Keycloak-->>AuthService: new access_token, new refresh_token
+            AuthService->>Redis: UPDATE session tokens
+        end
+        
+        AuthService->>AuthService: Rotate session (session fixation protection)
+        AuthService->>Redis: DELETE session:{session_id_old}
+        AuthService->>Redis: SET session:{session_id_new}
+        AuthService-->>ReportAPI: {valid: true, user, new_session_id}
+    end
+
+    Note over ReportAPI,ClickHouse: 3. Получение данных для отчёта
+
+    ReportAPI->>CRM: SELECT id FROM customers WHERE email = {user_email}
+    CRM-->>ReportAPI: user_id (numeric)
+    
+    ReportAPI->>ClickHouse: SELECT<br/>    toStartOfFiveMinute(signal_time) as interval_start,<br/>    prosthesis_type,<br/>    avg(signal_frequency) as avg_frequency,<br/>    avg(signal_duration) as avg_duration,<br/>    avg(signal_amplitude) as avg_amplitude,<br/>    count() as signal_count<br/>FROM telemetry_stat<br/>WHERE user_id = {user_id}<br/>  AND signal_time BETWEEN start_date AND end_date<br/>GROUP BY interval_start, prosthesis_type<br/>HAVING count() > 0<br/>ORDER BY interval_start, prosthesis_type
+    ClickHouse-->>ReportAPI: Aggregated telemetry data
+    
+    ReportAPI->>ReportAPI: Format data (JSON)
+
+    Note over ReportAPI,Frontend: 4. Ответ с данными и ротацией сессии
+
+    alt new_session_id present
+        ReportAPI->>ReportAPI: Add header X-New-Session-Id
+        ReportAPI-->>Frontend: 200 OK + report JSON + X-New-Session-Id header
+        Frontend->>Frontend: Parse report data and render table
+        Frontend->>Frontend: Detect X-New-Session-Id header
+        Frontend->>AuthService: POST /auth/refresh-cookie<br/>{session_id: new_session_id}
+        AuthService->>Redis: GET session:{new_session_id}
+        Redis-->>AuthService: Session data
+        AuthService->>Frontend: Set-Cookie: session_id=new_session_id
+        Frontend->>Frontend: Update stored cookie
+    else no rotation
+        ReportAPI-->>Frontend: 200 OK + report JSON
+        Frontend->>Frontend: Parse report data and render table
+    end
+
+    Note over Frontend,User: 5. Отображение отчёта
+
+    Frontend-->>User: Display report table with metrics
+    User->>Frontend: Click "Download JSON"
+    Frontend->>Frontend: Save report as JSON file
