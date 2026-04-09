@@ -9,7 +9,7 @@ import logging
 import boto3
 import json
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
@@ -28,6 +28,11 @@ app.add_middleware(
 AUTH_SERVICE_URL = "http://auth:8000"
 CLICKHOUSE_HOST = "clickhouse_db"
 CLICKHOUSE_PORT = 8123
+CRM_DB_HOST = "crm_db"
+CRM_DB_PORT = 5432
+CRM_DB_USER = "crm_user"
+CRM_DB_PASSWORD = "crm_password"
+CRM_DB_NAME = "crm_db"
 
 # ========== Настройки Minio/S3 ==========
 MINIO_ENDPOINT = "http://minio:9000"
@@ -35,9 +40,7 @@ MINIO_ACCESS_KEY = "minio_user"
 MINIO_SECRET_KEY = "minio_password"
 MINIO_BUCKET = "reports"
 CDN_BASE_URL = "http://localhost:8085"
-
-# TTL кеша (5 минут)
-CACHE_TTL_SECONDS = 300
+METADATA_KEY = "metadata/etl_version.json"
 
 # ========== Настройка логирования ==========
 logging.basicConfig(level=logging.INFO)
@@ -64,6 +67,34 @@ def ensure_bucket_exists():
         logger.info(f"Bucket '{MINIO_BUCKET}' created")
 
 
+def get_current_etl_version() -> tuple[str, str]:
+    """
+    Получает текущую версию ETL из S3.
+    Возвращает (version, updated_at)
+    """
+    ensure_bucket_exists()
+
+    try:
+        response = s3_client.get_object(Bucket=MINIO_BUCKET, Key=METADATA_KEY)
+        metadata = json.loads(response['Body'].read().decode('utf-8'))
+        return metadata.get('version'), metadata.get('updated_at')
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'NoSuchKey':
+            new_version = datetime.now().isoformat()
+            s3_client.put_object(
+                Bucket=MINIO_BUCKET,
+                Key=METADATA_KEY,
+                Body=json.dumps({
+                    'version': new_version,
+                    'updated_at': new_version,
+                    'description': 'Initial ETL version'
+                })
+            )
+            logger.info(f"Created initial ETL version: {new_version}")
+            return new_version, new_version
+        raise
+
+
 def get_report_cache_key(user_id: int, start_date: str, end_date: str) -> str:
     """Генерирует ключ для хранения отчёта в S3"""
     params_str = f"{user_id}:{start_date}:{end_date}"
@@ -79,24 +110,22 @@ def get_cdn_url(cache_key: str) -> str:
     return f"{CDN_BASE_URL}/reports/{cache_key}"
 
 
-def is_report_fresh(cache_key: str) -> bool:
-    """
-    Проверяет, не устарел ли отчёт (моложе CACHE_TTL_SECONDS).
-    """
+def get_report_etl_version(cache_key: str) -> str | None:
+    """Получает версию ETL, под которой был сохранён отчёт"""
     try:
         response = s3_client.head_object(Bucket=MINIO_BUCKET, Key=cache_key)
-        last_modified = response['LastModified']
-        age = datetime.now(last_modified.tzinfo) - last_modified
-        is_fresh = age.total_seconds() < CACHE_TTL_SECONDS
-        logger.info(f"Report age: {age.total_seconds():.0f}s, fresh: {is_fresh}")
-        return is_fresh
-    except ClientError as e:
-        if e.response['Error']['Code'] == '404':
-            return False
-        raise
+        return response.get('Metadata', {}).get('etl-version')
+    except ClientError:
+        return None
 
 
-def save_report_to_s3(report_data: dict, cache_key: str) -> str:
+def is_report_valid(cache_key: str, current_etl_version: str) -> bool:
+    """Проверяет, актуален ли отчёт"""
+    report_version = get_report_etl_version(cache_key)
+    return report_version == current_etl_version
+
+
+def save_report_to_s3(report_data: dict, cache_key: str, etl_version: str) -> str:
     """Сохраняет отчёт в S3 и возвращает CDN URL"""
     ensure_bucket_exists()
 
@@ -106,26 +135,35 @@ def save_report_to_s3(report_data: dict, cache_key: str) -> str:
         Body=json.dumps(report_data, indent=2, default=str),
         ContentType='application/json',
         Metadata={
+            'etl-version': etl_version,
             'generated-at': datetime.now().isoformat()
         }
     )
-    logger.info(f"Report saved to S3: {cache_key}")
+    logger.info(f"Report saved to S3: {cache_key} (ETL version: {etl_version})")
 
     return get_cdn_url(cache_key)
 
 
-def get_report_from_s3(cache_key: str):
+def get_report_from_s3(cache_key: str, current_etl_version: str):
     """
-    Проверяет наличие и свежесть отчёта в S3.
-    Возвращает cdn_url или None.
+    Проверяет наличие и актуальность отчёта в S3.
+    Возвращает (cdn_url, is_valid) или (None, None).
     """
-    if is_report_fresh(cache_key):
-        cdn_url = get_cdn_url(cache_key)
-        logger.info(f"Fresh report found in cache: {cdn_url}")
-        return cdn_url
-    else:
-        logger.info(f"Report not found or stale: {cache_key}")
-        return None
+    try:
+        s3_client.head_object(Bucket=MINIO_BUCKET, Key=cache_key)
+
+        if is_report_valid(cache_key, current_etl_version):
+            cdn_url = get_cdn_url(cache_key)
+            logger.info(f"Report found in cache (valid): {cdn_url}")
+            return cdn_url, True
+        else:
+            logger.info(f"Report found but stale (ETL version mismatch)")
+            return None, False
+    except ClientError as e:
+        if e.response['Error']['Code'] == '404':
+            logger.info(f"Report not found in cache: {cache_key}")
+            return None, None
+        raise
 
 
 async def validate_session(session_id: str) -> tuple[dict, str | None]:
@@ -141,25 +179,23 @@ async def validate_session(session_id: str) -> tuple[dict, str | None]:
         logger.info(f"new_session_id from auth: {new_session_id}")
         return data, new_session_id
 
-
-async def get_user_id_by_email_from_clickhouse(email: str) -> int:
-    """Получение user_id из витрины ClickHouse (customers_snapshot)"""
-    client = clickhouse_connect.get_client(
-        host=CLICKHOUSE_HOST,
-        port=CLICKHOUSE_PORT,
-        username="default",
-        password="",
-        database="reports"
+async def get_user_id_by_email(email: str) -> int:
+    """Получение user_id из CRM по email"""
+    conn = await asyncpg.connect(
+        host=CRM_DB_HOST,
+        port=CRM_DB_PORT,
+        user=CRM_DB_USER,
+        password=CRM_DB_PASSWORD,
+        database=CRM_DB_NAME
     )
-    result = client.query_df(f"""
-        SELECT id FROM customers_snapshot
-        WHERE email = '{email}'
-        ORDER BY updated_at DESC
-        LIMIT 1
-    """)
-    if result.empty:
-        return None
-    return int(result.iloc[0]['id'])
+    try:
+        result = await conn.fetchrow(
+            "SELECT id FROM customers WHERE email = $1",
+            email
+        )
+        return result['id'] if result else None
+    finally:
+        await conn.close()
 
 
 @app.on_event("startup")
@@ -178,7 +214,7 @@ async def get_report(
 ):
     """
     Получение отчёта по телеметрии пользователя.
-    Кеширование в S3 на 5 минут (только если есть данные).
+    Поддерживает кеширование в S3 и CDN.
     """
     # 1. Получаем session_id из cookie
     session_id = request.cookies.get("session_id")
@@ -195,30 +231,36 @@ async def get_report(
     if not user_email:
         raise HTTPException(status_code=400, detail="User email not found")
 
-    # 3. По email получаем числовой user_id из ClickHouse (customers_snapshot)
-    user_id = await get_user_id_by_email_from_clickhouse(user_email)
+    # 3. По email получаем числовой user_id из CRM
+    user_id = await get_user_id_by_email(user_email)
     if not user_id:
         raise HTTPException(
             status_code=404,
             detail=f"User with email {user_email} not found in CRM"
         )
 
-    # 4. Генерируем ключ кеша и проверяем S3
-    cache_key = get_report_cache_key(user_id, start_date, end_date)
-    cdn_url = get_report_from_s3(cache_key)
+    # 4. Получаем текущую версию ETL
+    current_etl_version, data_updated_at = get_current_etl_version()
+    logger.info(f"Current ETL version: {current_etl_version}, updated at: {data_updated_at}")
 
-    # 5. Если отчёт есть и свежий — отдаём CDN ссылку
-    if cdn_url:
+    # 5. Генерируем ключ кеша и проверяем S3
+    cache_key = get_report_cache_key(user_id, start_date, end_date)
+    cdn_url, is_valid = get_report_from_s3(cache_key, current_etl_version)
+
+    # 6. Если отчёт есть и валиден — отдаём CDN ссылку
+    if cdn_url and is_valid:
         json_response = JSONResponse(content={
             "cached": True,
+            "valid": True,
             "cdn_url": cdn_url,
+            "data_updated_at": data_updated_at,
             "report_data": None
         })
         if new_session_id:
             json_response.headers["X-New-Session-Id"] = new_session_id
         return json_response
 
-    # 6. Генерируем новый отчёт из витрины telemetry_enriched
+    # 7. Генерируем новый отчёт
     logger.info(f"Generating new report for user {user_id}, period {start_date} - {end_date}")
 
     # Подключаемся к ClickHouse
@@ -233,7 +275,7 @@ async def get_report(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"ClickHouse connection error: {e}")
 
-    # Запрос к обогащённой витрине
+    # Формируем и выполняем запрос
     query = f"""
         SELECT
             toStartOfHour(signal_time) as interval_start,
@@ -242,7 +284,7 @@ async def get_report(
             avg(signal_duration) as avg_duration,
             avg(signal_amplitude) as avg_amplitude,
             count() as signal_count
-        FROM reports.telemetry_enriched
+        FROM telemetry_stat
         WHERE user_id = {user_id}
           AND signal_time >= parseDateTimeBestEffort('{start_date}')
           AND signal_time <= parseDateTimeBestEffort('{end_date}')
@@ -258,47 +300,42 @@ async def get_report(
 
     # Преобразуем результат в JSON
     if result.empty:
-        # Нет данных — не кешируем, возвращаем пустой ответ
-        content = {
-            "cached": False,
-            "report_data": {
-                "user_id": user_id,
-                "user_email": user_email,
-                "start_date": start_date,
-                "end_date": end_date,
-                "generated_at": datetime.now().isoformat(),
-                "total_intervals": 0,
-                "data": []
-            }
+        report_data = {
+            "user_id": user_id,
+            "user_email": user_email,
+            "start_date": start_date,
+            "end_date": end_date,
+            "generated_at": datetime.now().isoformat(),
+            "data_updated_at": data_updated_at,
+            "total_intervals": 0,
+            "data": []
         }
-        json_response = JSONResponse(content=content)
-        if new_session_id:
-            json_response.headers["X-New-Session-Id"] = new_session_id
-        return json_response
+    else:
+        result['interval_start'] = result['interval_start'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        result['avg_frequency'] = result['avg_frequency'].round(2)
+        result['avg_duration'] = result['avg_duration'].round(0).astype(int)
+        result['avg_amplitude'] = result['avg_amplitude'].round(2)
 
-    # Есть данные — форматируем результат
-    result['interval_start'] = result['interval_start'].dt.strftime('%Y-%m-%d %H:%M:%S')
-    result['avg_frequency'] = result['avg_frequency'].round(2)
-    result['avg_duration'] = result['avg_duration'].round(0).astype(int)
-    result['avg_amplitude'] = result['avg_amplitude'].round(2)
+        report_data = {
+            "user_id": user_id,
+            "user_email": user_email,
+            "start_date": start_date,
+            "end_date": end_date,
+            "generated_at": datetime.now().isoformat(),
+            "data_updated_at": data_updated_at,
+            "total_intervals": len(result),
+            "data": result.to_dict(orient='records')
+        }
 
-    report_data = {
-        "user_id": user_id,
-        "user_email": user_email,
-        "start_date": start_date,
-        "end_date": end_date,
-        "generated_at": datetime.now().isoformat(),
-        "total_intervals": len(result),
-        "data": result.to_dict(orient='records')
-    }
+    # 8. Сохраняем в S3
+    cdn_url = save_report_to_s3(report_data, cache_key, current_etl_version)
 
-    # 7. Сохраняем в S3 (только если есть данные)
-    cdn_url = save_report_to_s3(report_data, cache_key)
-
-    # 8. Формируем ответ
+    # 9. Формируем ответ
     content = {
         "cached": False,
+        "valid": True,
         "cdn_url": cdn_url,
+        "data_updated_at": data_updated_at,
         "report_data": report_data
     }
 

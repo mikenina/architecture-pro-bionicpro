@@ -98,7 +98,10 @@ docker compose up --build -d
 ![get-report-sequence](schemas/get-report-sequence.png)
 
 ## Задание 3. Снижение нагрузки на базу данных
-### Пайплайн
+_После внедрении фичи о получении пользовательской отчётности нагрузка на базу данных отчётности существенно возросла. Пользователи стали часто запрашивать свои отчёты. Но поскольку данные обновляются с помощью ETL-процесса по расписанию, на эти запросы пользователи получают одинаковые отчёты.
+Ваша задача — во-первых, снизить нагрузку на OLAP-базу, исключив необходимость повторных запросов для уже сформированных отчётов, а во-вторых, разработать механизм, который будет сохранять отчёты по пользователям в объектное хранилище S3 и раздавать их через CDN._
+
+### Пайплайн (ETL + API + CDN + S3)
 1. ETL запускается по расписанию
 2. Загружает новые данные
 3. Обновляет etl_version.json в S3 (меняется метка времени)
@@ -109,17 +112,79 @@ docker compose up --build -d
 8. Отдаёт CDN ссылку
 9. При повторном запросе (до следующего ETL) edge cache отдаёт кешированную версию
 
+[main.etl_join.py](report-api/main.etl_join.py)
+[dag_telemetry_etl.py](airflow/dags/telemetry_etl.py)
+
 ```bash
-docker exec -it bionicpro-minio-1 sh -c "
-    curl -sL https://dl.min.io/client/mc/release/linux-amd64/mc -o /tmp/mc && \
-    chmod +x /tmp/mc && \
-    /tmp/mc alias set local http://localhost:9000 minio_user minio_password && \
-    /tmp/mc anonymous set download local/reports && \
-    echo 'Bucket reports is now public'
-"
+docker compose up -d
+```
+
+Сброс переменной с датой последней загруженной записи 
+
+```bash
+docker exec bionicpro-airflow-webserver-1 airflow variables delete telemetry_last_processed_time
 ```
 
 ![reports-cached-screenshot](reports-cached-screenshot.png)
 
 ## Задание 4. Повышение оперативности и стабильности работы CRM
-не успеваю по срокам :(
+_База данных CRM увеличилась, и выполнение запросов на массовую выгрузку данных стало приводить к значительной нагрузке на систему. Это негативно сказывается на работе OLTP-запросов: они замедляются и часто завершаются ошибками. Это, в свою очередь, влияет на оперативность и стабильность работы CRM.
+Ваша задача — обеспечить разделение потоков операций: запросы на выгрузку не должны влиять на транзакционные операции в CRM._
+
+### Пайплайн (CDC + ETL + API + CDN + S3)
+1. CDC (Debezium + Kafka) отслеживает изменения в CRM PostgreSQL в реальном времени
+2. ClickHouse читает из Kafka и обновляет customers_snapshot (актуальное состояние CRM)
+3. ETL (Airflow) запускается по расписанию (каждый час):
+    - Загружает новые данные телеметрии из PostgreSQL
+    - Записывает в ClickHouse (telemetry_raw)
+4. При вставке в telemetry_raw срабатывает MaterializedView:
+    - JOIN с customers_snapshot
+    - Обогащённые данные попадают в telemetry_enriched
+5. Пользователь запрашивает отчёт
+6. API проверяет сессию, получает user_id из customers_snapshot
+7. API проверяет наличие свежего отчёта в S3 (TTL 5 минут):
+    - Есть → отдаёт CDN ссылку (кеш)
+    - Нет → генерирует отчёт из telemetry_enriched
+8. Сгенерированный отчёт сохраняется в S3, возвращается CDN ссылка
+9. Nginx (CDN) кеширует отчёт и отдаёт при повторных запросах
+
+[main.py](report-api/main.py)
+[dag_telemetry_raw_etl.py](airflow/dags/telemetry_raw_etl.py)
+
+```bash
+docker compose up -d
+```
+
+```bash
+curl -X POST http://localhost:8083/connectors \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "crm-connector",
+    "config": {
+      "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+      "database.hostname": "crm_db",
+      "database.port": "5432",
+      "database.user": "crm_user",
+      "database.password": "crm_password",
+      "database.dbname": "crm_db",
+      "database.server.name": "crm",
+      "plugin.name": "pgoutput",
+      "table.include.list": "public.customers",
+      "topic.prefix": "crm",
+      "snapshot.mode": "initial",
+      "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "key.converter.schemas.enable": "false",
+      "value.converter.schemas.enable": "false",
+      "transforms": "unwrap",
+      "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+      "transforms.unwrap.drop.tombstones": "false"
+    }
+  }'
+```
+
+```bash
+curl -s http://localhost:8083/connectors/crm-connector/status | jq
+
+docker exec bionicpro-kafka kafka-topics --bootstrap-server localhost:9092 --list | grep crm
+```

@@ -221,32 +221,6 @@ def save_last_processed_time(**context):
     else:
         logger.info("No batch_max_time found, nothing to save")
 
-
-# Определяем задачи
-extract_telemetry_task = PythonOperator(
-    task_id='extract_telemetry',
-    python_callable=extract_telemetry,
-    dag=dag,
-)
-
-extract_crm_task = PythonOperator(
-    task_id='extract_crm',
-    python_callable=extract_crm,
-    dag=dag,
-)
-
-enrich_load_task = PythonOperator(
-    task_id='enrich_and_load',
-    python_callable=enrich_and_load,
-    dag=dag,
-)
-
-save_time_task = PythonOperator(
-    task_id='save_last_processed_time',
-    python_callable=save_last_processed_time,
-    dag=dag,
-)
-
 def update_etl_version(**context):
     """
     Обновляет метку времени последнего успешного ETL в S3.
@@ -298,6 +272,30 @@ def update_etl_version(**context):
     print(f"ETL version updated to {new_version}")
     return new_version
 
+# Определяем задачи
+extract_telemetry_task = PythonOperator(
+    task_id='extract_telemetry',
+    python_callable=extract_telemetry,
+    dag=dag,
+)
+
+extract_crm_task = PythonOperator(
+    task_id='extract_crm',
+    python_callable=extract_crm,
+    dag=dag,
+)
+
+enrich_load_task = PythonOperator(
+    task_id='enrich_and_load',
+    python_callable=enrich_and_load,
+    dag=dag,
+)
+
+save_time_task = PythonOperator(
+    task_id='save_last_processed_time',
+    python_callable=save_last_processed_time,
+    dag=dag,
+)
 
 update_etl_version_task = PythonOperator(
     task_id='update_etl_version',

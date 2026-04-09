@@ -147,6 +147,7 @@ services:
       - AUTH_SERVICE_URL=http://auth:8000
       - CLICKHOUSE_HOST=clickhouse_db
       - CLICKHOUSE_PORT=8123
+      - CACHE_TTL_SECONDS=300
     depends_on:
       auth:
         condition: service_started
@@ -163,6 +164,10 @@ services:
       POSTGRES_DB: crm_db
       POSTGRES_USER: crm_user
       POSTGRES_PASSWORD: crm_password
+    command: >
+      postgres -c wal_level=logical
+               -c max_wal_senders=10
+               -c max_replication_slots=10
     volumes:
       - ./crm-db:/docker-entrypoint-initdb.d
       - ./postgres-crm-data:/var/lib/postgresql/data
@@ -205,6 +210,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    depends_on:
+      - kafka
 
   # ========== Airflow сервисы ==========
   airflow_db:
@@ -283,7 +290,7 @@ services:
     restart: always
 
   minio:
-    image: minio/minio
+    build: ./minio
     ports:
       - "9002:9000"
       - "9001:9001"
@@ -292,12 +299,11 @@ services:
     environment:
       MINIO_ROOT_USER: minio_user
       MINIO_ROOT_PASSWORD: minio_password
-    command: server --console-address ":9001" /data
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9002/minio/health/live" ]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+#    healthcheck:
+#      test: [ "CMD", "curl", "-f", "http://localhost:9002/minio/health/live" ]
+#      interval: 30s
+#      timeout: 20s
+#      retries: 3
     networks:
       - bionicpro-network
 
@@ -311,6 +317,51 @@ services:
       - cdn_cache:/var/cache/nginx
     depends_on:
       - minio
+    networks:
+      - bionicpro-network
+
+  # ========== Kafka и Zookeeper ==========
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: bionicpro-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - bionicpro-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: bionicpro-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    networks:
+      - bionicpro-network
+
+  debezium:
+    image: debezium/connect:2.5.0.Final
+    container_name: bionicpro-debezium
+    depends_on:
+      - kafka
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: debezium_connect_configs
+      OFFSET_STORAGE_TOPIC: debezium_connect_offsets
+      STATUS_STORAGE_TOPIC: debezium_connect_statuses
+    ports:
+      - "8083:8083"
     networks:
       - bionicpro-network
 
